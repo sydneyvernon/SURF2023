@@ -25,7 +25,6 @@ rng_seed = 41
 rng = Random.MersenneTwister(rng_seed)
 
 
-
 function main()
     dim_output = 2
     Γ = 0.1 * I
@@ -50,7 +49,6 @@ function main()
 
     final_gd, conv_gd = run_gd(theta_0, loss_fn, alpha_, N_steps)
 
-
     # sample initial ensemble and perform EKI
     N_ensemble = 5
     N_iterations = 7
@@ -72,12 +70,12 @@ function main()
     display(plot_a)
 
     # PLOT CONVERGENCE (EKI)
-    plot_b = plot([1:N_iterations+1], [conv_eki[:,j] for j in 1:N_ensemble], c = :black, label=["Loss" "" "" "" ""], legend = :bottomright, linewidth = 2)
+    plot_b = plot([1:N_iterations+1], [conv_eki[:,j] for j in 1:N_ensemble], c = :black, label=["Loss" "" "" "" ""], legend = :topright, linewidth = 2)
     xlabel!("EKI Iteration")
     display(plot_b)
 
     # PLOT CONVERGENCE (GD)
-    plot_c = plot([1:N_steps+1], conv_gd, c = :black, label = "Loss", legend = :bottomright, linewidth = 2)
+    plot_c = plot([1:N_steps+1], conv_gd, c = :black, label = "Loss", legend = :topright, linewidth = 2)
     xlabel!("Gradient Descent Iteration")
     display(plot_c)
 

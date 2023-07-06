@@ -54,6 +54,7 @@ nothing # hide
 # and adding Gaussian noise to the output.
 dim_output = 2
 
+#Q noise on both measurements (max-min and mean) is dist ~N(0,0.1), INDEPENDENT of each other.
 Γ = 0.1 * I
 noise_dist = MvNormal(zeros(dim_output), Γ)
 
@@ -67,9 +68,10 @@ nothing # hide
 # we define a prior with mean 2 and standard deviation 1. It is
 # additionally constrained to be nonnegative. For the vertical shift we define
 # a Gaussian prior with mean 0 and standard deviation 5.
-prior_u1 = constrained_gaussian("amplitude", 2, 1, 0, Inf)
+prior_u1 = constrained_gaussian("amplitude", 2, 1, 0, Inf)  #Q does this effectively resample when a negative is picked?
 prior_u2 = constrained_gaussian("vert_shift", 0, 5, -Inf, Inf)
-prior = combine_distributions([prior_u1, prior_u2])
+prior = combine_distributions([prior_u1, prior_u2])  #Q this makes sense as something we could sample a 2-element vector from.
+                                                     # could we describe w a covariance matrix like [[1,0],[0,5]]?
 nothing # hide
 
 # We now generate the initial ensemble and set up the ensemble Kalman inversion.
@@ -77,7 +79,6 @@ N_ensemble = 5
 N_iterations = 5
 
 initial_ensemble = EKP.construct_initial_ensemble(rng, prior, N_ensemble)
-
 ensemble_kalman_process = EKP.EnsembleKalmanProcess(initial_ensemble, y, Γ, Inversion(); rng = rng)
 nothing # hide
 
@@ -85,10 +86,8 @@ nothing # hide
 # ensemble from the last iteration, apply ``G(\theta)`` to each ensemble member,
 # and apply the Kalman update to the ensemble.
 for i in 1:N_iterations
-    params_i = get_ϕ_final(prior, ensemble_kalman_process)
-
+    params_i = get_ϕ_final(prior, ensemble_kalman_process) #Q what does it mean for these parameters to be "constrained"?
     G_ens = hcat([G(params_i[:, i]) for i in 1:N_ensemble]...)
-
     EKP.update_ensemble!(ensemble_kalman_process, G_ens)
 end
 nothing # hide

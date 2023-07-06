@@ -35,26 +35,31 @@ function main()
     theta_true = [1.0, 7.0]
     y = G(theta_true) .+ rand(noise_dist)
 
-    # sample initial ensemble and perform EKI
-    N_ensemble = 5
-    N_iterations = 7
-    initial_ensemble = draw_initial(prior, N_ensemble)
-    final_ensemble = run_eki(initial_ensemble, G, y, Γ, N_iterations)
-
+    # perform gradient descent
+    alpha_ = 1e-1 # step size
+    N_steps = 20
+    theta_0 = mean(prior) # start with an initial guess informed by the prior
+    
     # very simple loss function
     function loss_fn( 
         theta::Any,
     )
+        #return 0.5*(norm(G(theta) .- y).^2 + norm(theta .- theta_0).^2) # for EKI members, theta_0 is not the mean of the prior
         return norm(G(theta) .- y).^2
     end
 
-    # perform gradient descent
-    alpha = 1e-1 # step size
-    N_steps = 20
-    initial_gd = mean(prior) # start with an initial guess informed by the prior
-    final_gd = run_gd(initial_gd, loss_fn, alpha, N_steps)
+    final_gd, conv_gd = run_gd(theta_0, loss_fn, alpha_, N_steps)
 
-    plot(trange, model(theta_true...), c = :black, label = "Truth", legend = :bottomright, linewidth = 2)
+
+    # sample initial ensemble and perform EKI
+    N_ensemble = 5
+    N_iterations = 7
+    initial_ensemble = draw_initial(prior, N_ensemble)
+    final_ensemble, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn)
+
+
+    # PLOT MODEL EVALUATIONS, INITIAL/FINAL (all)
+    plot_a = plot(trange, model(theta_true...), c = :black, label = "Truth", legend = :bottomright, linewidth = 2)
     plot!(
         trange,
         [model(initial_ensemble[:, i]...) for i in 1:N_ensemble],
@@ -63,10 +68,20 @@ function main()
     )
     plot!(trange, [model(final_ensemble[:, i]...) for i in 1:N_ensemble], c = :blue, label = ["Final ensemble" "" "" "" ""])
     plot!(trange, model(final_gd...), c=:green, label = "Final after GD")
-
     xlabel!("Time")
+    display(plot_a)
 
-    # CONVERGENCE PLOTS
+    # PLOT CONVERGENCE (EKI)
+    plot_b = plot([1:N_iterations+1], [conv_eki[:,j] for j in 1:N_ensemble], c = :black, label=["Loss" "" "" "" ""], legend = :bottomright, linewidth = 2)
+    xlabel!("EKI Iteration")
+    display(plot_b)
+
+    # PLOT CONVERGENCE (GD)
+    plot_c = plot([1:N_steps+1], conv_gd, c = :black, label = "Loss", legend = :bottomright, linewidth = 2)
+    xlabel!("Gradient Descent Iteration")
+    display(plot_c)
+
+   
 
 end
 

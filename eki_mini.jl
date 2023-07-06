@@ -41,7 +41,6 @@ function eki_update(
     return ens_new
 end
 
-# solving the inverse problem
 function run_eki(
     initial_ensemble,
     G, # model
@@ -55,4 +54,29 @@ function run_eki(
             ensemble = ensemble_new
         end
         return ensemble
+end
+
+# keep track of convergence
+function run_eki(
+    initial_ensemble,
+    G, # model
+    y, # target or observed data
+    Γ, # covariance of measurement noise
+    N_iterations::Int,
+    loss_fn
+    ) 
+        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
+        for j in 1:size(initial_ensemble)[2]
+            conv[1,j] = loss_fn(initial_ensemble[:,j])
+        end
+
+        ensemble = initial_ensemble
+        for i in 1:N_iterations
+            ensemble_new = eki_update(ensemble, G, y, Γ)
+            ensemble = ensemble_new
+            for j in 1:size(initial_ensemble)[2]
+                conv[i+1,j] = loss_fn(ensemble[:,j])
+            end
+        end
+        return ensemble, conv
 end

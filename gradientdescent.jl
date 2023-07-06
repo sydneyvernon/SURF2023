@@ -14,10 +14,15 @@ function run_gd(
     loss_fn,
     alpha,
     N_iterations)
+        conv = zeros(N_iterations+1) # keep track of convergence
+        conv[1] = loss_fn(initial)
+
         current = initial
         for i in 1:N_iterations
             next = gd_step(current, loss_fn, alpha)
             current = next
+            conv[i+1] = loss_fn(current) # save cost value at current point 
         end
-        return current
+        return (current, conv)
+
 end

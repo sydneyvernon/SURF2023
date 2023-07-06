@@ -20,23 +20,28 @@ function eki_update(
     Γ_ = I(2)*0.1
 
     # run G on ensemble members
-    ens_eval = G_(ens[:,1]) # first output
-    for i in 2:N 
-        ens_eval = hcat(ens_eval, G_(ens[:,i]))
-    end
-    N_out = size(ens_eval)[1] # number of (summary) outputs (dim G(theta))
+    ens_eval_0 = G_(ens[:,1]) # first output
+    N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
 
-    t_mean = vcat([mean(ens[i,:]) for i in 1:N_param])
-    g_mean = vcat([mean(ens_eval[i,:]) for i in 1:N_out])
+    ens_eval = zeros(N_out, N)
+    ens_eval[:,1] = ens_eval_0
+    for i in 2:N 
+        ens_eval[:,i] = G_(ens[:,i])
+    end
+
+    t_mean = mean(ens, dims=2)
+    g_mean = mean(ens_eval, dims=2)
 
     # compute empirical covariance matrices
     C_tg = 1/N * sum((ens[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
     C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
     
     # construct array of updated ensemble members
-    ens_new = ens[:,1] .+ C_tg * inv(Γ_ .+ C_gg) * (y_ .- ens_eval[:,1])
-    for i in 2:N
-        ens_new = hcat(ens_new, ens[:,i] .+ C_tg * inv(Γ_ .+ C_gg) * (y_ .- ens_eval[:,i]))
+    ens_new = zeros(N_param, N)
+    ##ens_new = ens[:,1] .+ C_tg * inv(Γ_ .+ C_gg) * (y_ .- ens_eval[:,1])
+    for i in 1:N
+        ens_new[:,i] = ens[:,i] .+ C_tg * inv(Γ_ .+ C_gg) * (y_ .- ens_eval[:,i])
+        #ens_new = hcat(ens_new, ens[:,i] .+ C_tg * inv(Γ_ .+ C_gg) * (y_ .- ens_eval[:,i]))
     end
     return ens_new
 end

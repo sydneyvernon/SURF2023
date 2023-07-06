@@ -87,3 +87,32 @@ function run_gd_momentum(
         end
         return (current, conv)
 end
+
+function gd_step_nesterov(  # computes gradient using zygote
+    current,
+    loss_f,
+    alpha,
+    beta,
+    v,
+    )
+    v_new = beta*v .- alpha .* gradient((t1,t2) -> loss_f([t1,t2]), current[1]+beta*v[1],current[2]+beta*v[2])[:]
+    return current .+ v_new, v_new 
+end
+function run_gd_nesterov(
+    initial,
+    loss_fn,
+    alpha,
+    beta,
+    N_iterations)
+        conv = zeros(N_iterations+1) # keep track of convergence
+        conv[1] = loss_fn(initial)
+
+        current = initial
+        v = zeros(size(initial))
+        for i in 1:N_iterations
+            next, v = gd_step_nesterov(current, loss_fn, alpha, beta, v)
+            current = next
+            conv[i+1] = loss_fn(current) # save cost value at current point 
+        end
+        return (current, conv)
+end

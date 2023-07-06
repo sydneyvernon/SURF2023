@@ -27,7 +27,7 @@ rng = Random.MersenneTwister(rng_seed)
 
 function main()
     dim_output = 2
-    Γ = 0.1 * I
+    Γ = I(2)*0.1
     noise_dist = MvNormal(zeros(dim_output), Γ)
     prior = MvNormal(zeros(dim_output), I)
 
@@ -78,8 +78,6 @@ function main()
     plot_c = plot([1:N_steps+1], conv_gd, c = :black, label = "Loss", legend = :topright, linewidth = 2)
     xlabel!("Gradient Descent Iteration")
     display(plot_c)
-
-   
 
 end
 

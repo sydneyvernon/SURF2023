@@ -33,45 +33,37 @@ function main()
 
     theta_true = [1.0, 0.8]
 
-    #N_trials = 5
-
-    #for trial in 1:N_trials:
-    y = G(theta_true) .+ rand(noise_dist)
-  
-    # very simple loss function
-    function loss_fn( 
+    function loss_fn(   ##  squared norm on parameters
         theta::Any,
     )
-        return mean((theta - theta_true).^2) ## MSE on parameters
+        return norm(theta-theta_true).^2
     end
 
-    # sample initial ensemble and perform EKI
+    N_trials = 100
+    N_iterations = 10  # EKI iterations in each trial
     N_ensemble = 5
-    N_iterations = 7
-    initial_ensemble = draw_initial(prior, N_ensemble)
-    final_ensemble, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn)
 
+    # store convergence for each trial
+    convs = zeros(N_trials, N_iterations+1)
 
-    # PLOT MODEL EVALUATIONS, INITIAL/FINAL (all)
-    plot_a = plot(trange, model(theta_true...), c = :black, label = "Truth", legend = :bottomright, linewidth = 2)
-    plot!(
-        trange,
-        [model(initial_ensemble[:, i]...) for i in 1:N_ensemble],
-        c = :red,
-        label = ["Initial ensemble" "" "" "" ""],
-    )
-    plot!(trange, [model(final_ensemble[:, i]...) for i in 1:N_ensemble], c = :blue, label = ["Final ensemble" "" "" "" ""])
-    #plot!(trange, model(final_gd...), c=:green, label = "Final after GD")
-    xlabel!("Time")
-    display(plot_a)
+    for trial in 1:N_trials
+        y = G(theta_true) .+ rand(noise_dist)  # each trial has new noise on obs
+    
+        # sample initial ensemble and perform EKI        
+        initial_ensemble = draw_initial(prior, N_ensemble)
+        final_ensemble, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn)
+
+        convs[trial, :] = mean(conv_eki, dims=2)  # mean loss of all ensemble members
+        
+    end
 
     # PLOT CONVERGENCE (EKI)
-    plot_b = plot([1:N_iterations+1], [conv_eki[:,j] for j in 1:N_ensemble], c = :black, label=["Loss" "" "" "" ""], legend = :topright, linewidth = 2)
+    plot_b = plot([0:N_iterations], mean(convs, dims=1)[:], c = :black, label=["Loss" "" "" "" ""], legend = :topright, linewidth = 2)
     xlabel!("EKI Iteration")
     display(plot_b)
 
-    # PLOT CONVERGENCE (EKI)
-    plot_c = plot([1:N_iterations+1], [log.(conv_eki[:,j]) for j in 1:N_ensemble], c = :black, label=["log(Loss)" "" "" "" ""], legend = :topright, linewidth = 2)
+    ## PLOT CONVERGENCE (EKI)
+    plot_c = plot([0:N_iterations],log.(mean(convs, dims=1)[:]), c = :black, label=["log(Loss)" "" "" "" ""], legend = :topright, linewidth = 2)
     xlabel!("EKI Iteration")
     display(plot_c)
 

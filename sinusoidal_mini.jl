@@ -45,6 +45,7 @@ function main()
     )
         #return 0.5*(norm(G(theta) .- y).^2 + norm(theta .- theta_0).^2) # for EKI members, theta_0 is not the mean of the prior
         return norm(G(theta) .- y).^2
+        #return (G(theta) .- y)' * inv(Γ) * (G(theta) .- y) ## ZYGOTE GRADIENT PROBLEMS
     end
 
     final_gd, conv_gd = run_gd(theta_0, loss_fn, alpha_, N_steps)
@@ -68,16 +69,25 @@ function main()
     plot!(trange, model(final_gd...), c=:green, label = "Final after GD")
     xlabel!("Time")
     display(plot_a)
+    savefig(plot_a,"sinusoidal.pdf")    
 
     # PLOT CONVERGENCE (EKI)
-    plot_b = plot([1:N_iterations+1], [conv_eki[:,j] for j in 1:N_ensemble], c = :black, label=["Loss" "" "" "" ""], legend = :topright, linewidth = 2)
+    plot_b = plot([0:N_iterations], [conv_eki[:,j] for j in 1:N_ensemble], c = :black, label=["Loss" "" "" "" ""], legend = :topright, linewidth = 2)
     xlabel!("EKI Iteration")
     display(plot_b)
 
-    # PLOT CONVERGENCE (GD)
-    plot_c = plot([1:N_steps+1], conv_gd, c = :black, label = "Loss", legend = :topright, linewidth = 2)
+    plot_b = plot([0:N_iterations], [log.(conv_eki[:,j]) for j in 1:N_ensemble], c = :black, label=["Ensemble member" "" "" "" ""], legend = :topright, linewidth = 2)
+    xlabel!("EKI Iteration")
+    ylabel!("log(Loss)")
+    display(plot_b)
+    savefig(plot_b,"sinusoidal_eki_conv.pdf")  
+
+    #PLOT CONVERGENCE (GD)
+    plot_c = plot([0:N_steps], conv_gd, c = :black, label="", linewidth = 2) #label = "Loss", legend = :topright, linewidth = 2)
     xlabel!("Gradient Descent Iteration")
+    ylabel!("Loss")
     display(plot_c)
+    savefig(plot_c,"sinusoidal_gd_conv.pdf")  
 
 end
 

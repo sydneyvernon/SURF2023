@@ -29,7 +29,7 @@ function main()
     dim_output = 2
     Γ = I(2)*0.1
     noise_dist = MvNormal(zeros(dim_output), Γ)
-    prior = MvNormal([2,0], diagm([1,5]))
+    prior = MvNormal([2,0], diagm([1,25]))
 
     theta_true = [1.0, 0.8]
 
@@ -40,8 +40,8 @@ function main()
     end
 
     N_trials = 100
-    N_iterations = 10  # EKI iterations in each trial
-    N_ensemble = 5
+    N_iterations = 30  # EKI iterations in each trial
+    N_ensemble = 50
 
     # store convergence for each trial
     convs = zeros(N_trials, N_iterations+1)
@@ -54,7 +54,6 @@ function main()
         final_ensemble, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn)
 
         convs[trial, :] = mean(conv_eki, dims=2)  # mean loss of all ensemble members
-        
     end
 
     # PLOT CONVERGENCE (EKI)
@@ -63,14 +62,12 @@ function main()
     display(plot_b)
 
     ## PLOT CONVERGENCE (EKI)
-    plot_c = plot([0:N_iterations],log.(mean(convs, dims=1)[:]), c = :black, label=["log(Loss)" "" "" "" ""], legend = :topright, linewidth = 2)
+    plot_c = plot([0:N_iterations],log.(mean(convs, dims=1)[:]), c = :black, label="") #, legend = :topright, linewidth = 2)
     xlabel!("EKI Iteration")
+    ylabel!("log(Loss)")
     display(plot_c)
+    savefig(plot_c, "exp_sin.pdf")
 
-    # PLOT CONVERGENCE (GD)
-    #plot_c = plot([1:N_steps+1], conv_gd, c = :black, label = "Loss", legend = :topright, linewidth = 2)
-    #xlabel!("Gradient Descent Iteration")
-    #display(plot_c)
 
 end
 

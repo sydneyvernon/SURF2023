@@ -19,7 +19,7 @@ function eki_update(
     N_param = size(ens)[1] # number of parameters (dim theta)
     
     # run G on ensemble members
-    ens_eval_0 = G_(ens[:,1]) # first output
+    ens_eval_0 = G_(ens[:,1]) # first output 
     N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
 
     ens_eval = zeros(N_out, N)
@@ -72,6 +72,7 @@ function run_eki(
             conv[1,j] = loss_fn(initial_ensemble[:,j])
         end
 
+
         ensemble = initial_ensemble
         for i in 1:N_iterations
             ensemble_new = eki_update(ensemble, G, y, Γ)
@@ -82,27 +83,3 @@ function run_eki(
         end
         return ensemble, conv
 end
-
-# function run_eki_updatedloss(
-#     initial_ensemble,
-#     G, # model
-#     y, # target or observed data
-#     Γ, # covariance of measurement noise
-#     N_iterations::Int,
-#     loss_fn
-#     ) 
-#         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-#         for j in 1:size(initial_ensemble)[2]
-#             conv[1,j] = loss_fn(initial_ensemble[:,j])
-#         end
-
-#         ensemble = initial_ensemble
-#         for i in 1:N_iterations
-#             ensemble_new = eki_update(ensemble, G, y, Γ)
-#             ensemble = ensemble_new
-#             for j in 1:size(initial_ensemble)[2]
-#                 conv[i+1,j] = loss_fn(ensemble[:,j])
-#             end
-#         end
-#         return ensemble, conv
-# end

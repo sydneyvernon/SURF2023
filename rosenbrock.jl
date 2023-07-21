@@ -33,25 +33,47 @@ for i in 1:3
     final_gdn, conv_gdn[i,:] = run_gd_nesterov(initials[i], rosenbrock, alpha_, beta_, N_steps)
 end
 
+
+
 ## reinterpret as an inverse problem
+
 dim_output = 1
 dim_input = 2
 Γ = I(dim_output)*0.1  # we don't add noise to the observation, Γ^-1 informs EKI algorithm similar to step size
 noise_dist = MvNormal(zeros(dim_output), Γ)
-prior = MvNormal(zeros(dim_input), I) ## variance on prior?
+prior = MvNormal(zeros(dim_input), I*0.1) ## variance on prior?
 theta_true = [1.0, 1.0]  ## known location of minimum
 G(theta) = rosenbrock(theta)*I(1) #  quick fix for scalar issue
-y = G(theta_true)
 
-function loss_eki(theta)  # used for plotting; y = 0 so it is simply function value
-    return norm((G(theta) - y))
+N_trials = 100
+N_ensemble = 10
+N_iterations = 20
+convs = zeros(N_trials, N_iterations+1)
+convs_m = zeros(N_trials, N_iterations+1)
+convs_m1 = zeros(N_trials, N_iterations+1)
+convs_m2 = zeros(N_trials, N_iterations+1)
+r = [3,5,10]
+
+for trial in 1:N_trials
+    local y = G(theta_true) + rand(noise_dist) # each trial has new random noise
+
+    function loss_eki(theta)  # used for plotting
+        return norm((G(theta) - y))
+    end
+
+    # sample initial ensemble and perform EKI
+    local initial_ensemble = draw_initial(prior, N_ensemble)
+    local final_ensemble, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_eki)
+
+    local final_ensemble_m, conv_eki_m = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[1])
+    local final_ensemble_m1, conv_eki_m1 = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[2])
+    local final_ensemble_m2, conv_eki_m2 = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[3])
+
+    convs[trial,:] = mean(conv_eki, dims=2) # mean over ensemble members
+    convs_m[trial, :] = mean(conv_eki_m, dims=2)  
+    convs_m1[trial, :] = mean(conv_eki_m1, dims=2)
+    convs_m2[trial, :] = mean(conv_eki_m2, dims=2)
 end
-
-# sample initial ensemble and perform EKI
-N_ensemble = 5
-N_iterations = 10
-initial_ensemble = draw_initial(prior, N_ensemble)
-final_ensemble, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_eki)
 
 plots = []
 
@@ -65,7 +87,14 @@ plots = []
 #     push!(plots,plot_gd)
 # end
 
-plota = plot([1:N_iterations+1], log.(mean(conv_eki, dims=2)), c = :black, label="")
+println(size(convs))
+println(size(log.(convs)))
+
+plota = plot([1:N_iterations+1], mean(log.(convs), dims=1)', c = :black, label="traditional EKI")
+plot!([1:N_iterations+1], mean(log.(convs_m), dims=1)', c = :red, label="r = "*string(r[1]))
+plot!([1:N_iterations+1], mean(log.(convs_m1), dims=1)', c = :blue, label="r = "*string(r[2]))
+plot!([1:N_iterations+1], mean(log.(convs_m2), dims=1)', c = :green, label="r = "*string(r[3]))
+
 xlabel!("EKI iteration, N_ensemble = "*string(N_ensemble))
 ylabel!("log(Loss)")
 display(plota)

@@ -87,7 +87,7 @@ function eki_update_momentum(
     ens::AbstractMatrix{},
     ens_prev,
     G_, 
-    y_,
+    y,
     Γ_,
     k::Int, ## iteration number
     s, ## dt^2,
@@ -116,10 +116,10 @@ function eki_update_momentum(
     ens_new = zeros(N_param, N)
 
     for i in 1:N
-        v[:,i] = ens[:,i] + (1-r/k)*(ens[:,i] .- ens_prev[:,i])
-        ens_new[:,i] = v[:,i] + C_tg * inv(Γ_ + C_gg) * (y - ens_eval[:,i])
+        v[:,i] = ens[:,i] .+ (1-r/k)*(ens[:,i] .- ens_prev[:,i])
+        ens_new[:,i] = v[:,i] .+ C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i])
         if k < r
-            ens_new[:,i] = ens[:,i] + C_tg * inv(Γ_ + C_gg) * (y - ens_eval[:,i]) # normal update step
+            ens_new[:,i] = ens[:,i] .+ C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]) # normal update step
         end
     end
 
@@ -154,4 +154,65 @@ function run_eki_momentum(
             end
         end
         return ensemble, conv
+end
+
+
+
+## variants to track parameter values
+function run_eki_momentum_tracked(
+    initial_ensemble,
+    G, # model
+    y, # target or observed data
+    Γ, # covariance of measurement noise
+    N_iterations::Int,
+    loss_fn,
+    s=1,
+    r=3
+    ) 
+        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
+        ens_historical = zeros(N_iterations+1, size(initial_ensemble)[1], size(initial_ensemble)[2])
+        ens_historical[1,:,:] = initial_ensemble
+        for j in 1:size(initial_ensemble)[2]
+            conv[1,j] = loss_fn(initial_ensemble[:,j])
+        end
+        
+        ensemble = initial_ensemble
+        ens_prev = zeros(size(initial_ensemble))
+        for i in 1:N_iterations
+            ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r)
+            ens_prev = ensemble
+            ensemble = ensemble_new
+            for j in 1:size(initial_ensemble)[2]
+                conv[i+1,j] = loss_fn(ensemble[:,j])
+            end
+            ens_historical[i+1,:,:] = ensemble
+        end
+        return ens_historical, conv
+end
+
+function run_eki_tracked(
+    initial_ensemble,
+    G, # model
+    y, # target or observed data
+    Γ, # covariance of measurement noise
+    N_iterations::Int,
+    loss_fn
+    ) 
+        ens_historical = zeros(N_iterations+1, size(initial_ensemble)[1], size(initial_ensemble)[2])
+        ens_historical[1,:,:] = initial_ensemble
+        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
+        for j in 1:size(initial_ensemble)[2]
+            conv[1,j] = loss_fn(initial_ensemble[:,j])
+        end
+
+        ensemble = initial_ensemble
+        for i in 1:N_iterations
+            ensemble_new = eki_update(ensemble, G, y, Γ)
+            ensemble = ensemble_new
+            for j in 1:size(initial_ensemble)[2]
+                conv[i+1,j] = loss_fn(ensemble[:,j])
+            end
+            ens_historical[i+1,:,:] = ensemble
+        end
+        return ens_historical, conv
 end

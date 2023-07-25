@@ -20,7 +20,7 @@ for i in 1:3
 end
 
 ## now with momentum
-beta_ = 0.9
+beta_ = 0.5
 alpha_ = 5*1e-3
 conv_gdm = zeros(length(initials), N_steps+1)
 for i in 1:3
@@ -28,6 +28,7 @@ for i in 1:3
 end
 
 ## now with nesterov variation on momentum
+beta_ = 0.5
 conv_gdn = zeros(length(initials), N_steps+1)
 for i in 1:3
     final_gdn, conv_gdn[i,:] = run_gd_nesterov(initials[i], rosenbrock, alpha_, beta_, N_steps)
@@ -135,18 +136,5 @@ plot!([1:N_steps+1], mean(log.(conv_gdn[i,:]) for i in 1:3), c = :green, label =
 xlabel!("GD step")
 ylabel!("log(Loss)")
 push!(plots,plot_means)
-
-# ## GRAD DESCENT PARAMETER SPACE
-# plot_param = plot()
-# xlims!(-1,1.5)
-# ylims!(-1,1.2)
-# for i in 1:N_iterations+1
-#     plot!(ens_historical_m[i,1,:],ens_historical_m[i,2,:],seriestype=:scatter, label="", marker_z=i)
-# end
-# plot!([1], [1], ms = 7, label="truth", markershape=:star5,) 
-# xlabel!("theta_1")
-# ylabel!("theta_2")
-# title!("Rosenbrock IP parameter evolution (momentum)")
-# display(plot_param)
 
 plot(plots...)

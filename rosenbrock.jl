@@ -40,17 +40,18 @@ end
 
 dim_output = 1
 dim_input = 2
-Γ = I(dim_output)*0.1  # we don't add noise to the observation, Γ^-1 informs EKI algorithm similar to step size
+Γ = I(dim_output)*0.1 
 noise_dist = MvNormal(zeros(dim_output), Γ)
-prior = MvNormal(zeros(dim_input), I*0.1) ## variance on prior?
+prior = MvNormal(zeros(dim_input), I*10) ## variance on prior?
 theta_true = [1.0, 1.0]  ## known location of minimum
 G(theta) = rosenbrock(theta)*I(1) #  quick fix for scalar issue
 
 N_trials = 100
-N_ensemble = 5
-N_iterations = 15
+N_ensemble = 50
+N_iterations = 100
 convs = zeros(N_trials, N_iterations+1)
 convs_m = zeros(N_trials, N_iterations+1)
+convs_m_means = zeros(N_trials, N_iterations+1)
 convs_m1 = zeros(N_trials, N_iterations+1)
 convs_m2 = zeros(N_trials, N_iterations+1)
 r = [3,5,10]
@@ -58,12 +59,17 @@ r = [3,5,10]
 # for one trial only, we will visualize in parameter space
 global ens_historical = zeros(N_iterations+1, dim_input, N_ensemble)
 global ens_historical_m = zeros(N_iterations+1, dim_input, N_ensemble)
+lambda = 0.5
 
 for trial in 1:N_trials
     local y = G(theta_true) + rand(noise_dist) # each trial has new random noise
 
-    function loss_eki(theta)  # used for plotting
-        return norm((G(theta) - y))
+    # function loss_eki(theta)  # used for plotting
+    #     return norm((G(theta) - y))
+    # end
+
+    function loss_eki(theta)
+        return norm(inv(Γ).^0.5 * (G(theta) .- y))
     end
 
     # sample initial ensemble and perform EKI
@@ -73,32 +79,25 @@ for trial in 1:N_trials
     global ens_historical_m, conv_eki_m = run_eki_momentum_tracked(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[1])
     local final_ensemble_m1, conv_eki_m1 = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[2])
     local final_ensemble_m2, conv_eki_m2 = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[3])
+    local final_ensemble_means, conv_eki_means = run_eki_momentum_means(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[1])
 
     convs[trial,:] = mean(conv_eki, dims=2) # mean over ensemble members
     convs_m[trial, :] = mean(conv_eki_m, dims=2)  
     convs_m1[trial, :] = mean(conv_eki_m1, dims=2)
     convs_m2[trial, :] = mean(conv_eki_m2, dims=2)
+    convs_m_means[trial, :] = mean(conv_eki_means, dims=2)
 end
 
 plots = []
 
-## code for individual IC plots:
-# for k in 1:length(initials)
-#     plot_gd = plot([1:N_steps+1], conv_gd[k,:], c = :black, label = "GD", legend = :topright, linewidth = 2)
-#     plot!([1:N_steps+1], conv_gdm[k,:], c = :blue, label = "GD with momentum", legend = :topright, linewidth = 2)
-#     plot!([1:N_steps+1], conv_gdn[k,:], c = :green, label = "GD with Nesterov momentum", legend = :topright, linewidth = 2)
-#     xlabel!("Iteration")
-#     ylabel!("Loss")
-#     push!(plots,plot_gd)
-# end
-
 ## EKI CONV PLOT
 plota = plot([1:N_iterations+1], mean(log.(convs), dims=1)', c = :black, label="traditional EKI")
 plot!([1:N_iterations+1], mean(log.(convs_m), dims=1)', c = :red, label="r = "*string(r[1]))
-plot!([1:N_iterations+1], mean(log.(convs_m1), dims=1)', c = :blue, label="r = "*string(r[2]))
-plot!([1:N_iterations+1], mean(log.(convs_m2), dims=1)', c = :green, label="r = "*string(r[3]))
+# plot!([1:N_iterations+1], mean(log.(convs_m1), dims=1)', c = :blue, label="r = "*string(r[2]))
+# plot!([1:N_iterations+1], mean(log.(convs_m2), dims=1)', c = :green, label="r = "*string(r[3]))
+plot!([1:N_iterations+1], mean(log.(convs_m_means), dims=1)', c = :blue, label="ensemble mean momentum r="*string(r[1]))
 
-xlabel!("EKI iteration, N_ensemble = "*string(N_ensemble))
+xlabel!("EKI iteration, N_ensemble = "*string(N_ensemble)*", N_trials = "*string(N_trials))
 ylabel!("log(Loss)")
 display(plota)
 
@@ -109,7 +108,6 @@ ylims!(-1,1.2)
 for i in 1:N_iterations
     plot!(ens_historical[i,1,:],ens_historical[i,2,:],seriestype=:scatter, label="", marker_z = i)
 end
-plot!([1], [1], ms = 7, label="truth", markershape=:star5,) 
 plot!([1], [1], ms = 7, label="truth", markershape=:star5,) 
 xlabel!("theta_1")
 ylabel!("theta_2")

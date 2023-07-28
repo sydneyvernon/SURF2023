@@ -42,12 +42,12 @@ dim_output = 1
 dim_input = 2
 Γ = I(dim_output)*0.1 
 noise_dist = MvNormal(zeros(dim_output), Γ)
-prior = MvNormal(zeros(dim_input), I*10) ## variance on prior?
+prior = MvNormal(zeros(dim_input), I*0.1)
 theta_true = [1.0, 1.0]  ## known location of minimum
 G(theta) = rosenbrock(theta)*I(1) #  quick fix for scalar issue
 
 N_trials = 100
-N_ensemble = 50
+N_ensemble = 10
 N_iterations = 100
 convs = zeros(N_trials, N_iterations+1)
 convs_m = zeros(N_trials, N_iterations+1)
@@ -74,7 +74,7 @@ for trial in 1:N_trials
 
     # sample initial ensemble and perform EKI
     local initial_ensemble = draw_initial(prior, N_ensemble)
-    global ens_historical, conv_eki = run_eki_tracked(initial_ensemble, G, y, Γ, N_iterations, loss_eki)
+    global ens_historical, conv_eki = run_eki_tracked(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1)
 
     global ens_historical_m, conv_eki_m = run_eki_momentum_tracked(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[1])
     local final_ensemble_m1, conv_eki_m1 = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_eki, 1,r[2])

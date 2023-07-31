@@ -1,5 +1,6 @@
 using LinearAlgebra, Random
-using Distributions, Plots
+using Distributions
+using Plots; pythonplot()
 
 include("eki_mini.jl")
 include("gradientdescent.jl")
@@ -42,13 +43,13 @@ dim_output = 1
 dim_input = 2
 Γ = I(dim_output)*0.1 
 noise_dist = MvNormal(zeros(dim_output), Γ)
-prior = MvNormal(zeros(dim_input), I*0.1)
+prior = MvNormal([3,3], I(2)*0.1) #MvNormal(zeros(dim_input), I*0.1)
 theta_true = [1.0, 1.0]  ## known location of minimum
 G(theta) = rosenbrock(theta)*I(1) #  quick fix for scalar issue
 
 N_trials = 100
-N_ensemble = 10
-N_iterations = 100
+N_ensemble = 5
+N_iterations = 20
 convs = zeros(N_trials, N_iterations+1)
 convs_m = zeros(N_trials, N_iterations+1)
 convs_m_means = zeros(N_trials, N_iterations+1)
@@ -62,14 +63,14 @@ global ens_historical_m = zeros(N_iterations+1, dim_input, N_ensemble)
 lambda = 0.5
 
 for trial in 1:N_trials
-    local y = G(theta_true) + rand(noise_dist) # each trial has new random noise
+    local y = G(theta_true) #+ rand(noise_dist) # each trial has new random noise
 
     # function loss_eki(theta)  # used for plotting
     #     return norm((G(theta) - y))
     # end
 
     function loss_eki(theta)
-        return norm(inv(Γ).^0.5 * (G(theta) .- y))
+        return norm(inv(Γ).^0.5 * (G(theta) .- y).^2)
     end
 
     # sample initial ensemble and perform EKI
@@ -103,36 +104,43 @@ display(plota)
 
 ## EKI PARAMETER SPACE
 plot_param = plot()
-xlims!(-1,1.5)
-ylims!(-1,1.2)
-for i in 1:N_iterations
-    plot!(ens_historical[i,1,:],ens_historical[i,2,:],seriestype=:scatter, label="", marker_z = i)
-end
-plot!([1], [1], ms = 7, label="truth", markershape=:star5,) 
+xlims!(-5,5)
+ylims!(-5,5)
 xlabel!("theta_1")
 ylabel!("theta_2")
 title!("Rosenbrock IP parameter evolution (no momentum)")
+xrange = collect(LinRange(-5,5,20)) #-1:0.1:1.5
+yrange = collect(LinRange(-5,5,30))
+a=1
+b=5
+z = reshape([@.log((a-x)^2 + b*(y - x.^2)^2) for x in xrange for y in yrange],30,20)
+contour!(yrange, xrange, z', levels=15, clabels=false, color=[:black])
+for i in 1:N_iterations
+    plot!(ens_historical[i,1,:],ens_historical[i,2,:],seriestype=:scatter, label="", marker_alpha=1, marker_z=i, cbar=false)
+end
+plot!([1], [1], ms = 7, label="truth", markershape=:star5, markeralpha=1, mc=:red) 
 display(plot_param)
 
 ## EKI PARAMETER SPACE
 plot_param = plot()
-xlims!(-1,1.5)
-ylims!(-1,1.2)
+xlims!(-5,5)
+ylims!(-5,5)
+contour!(yrange, xrange, z', levels=15, clabels=false, color=[:black])
 for i in 1:N_iterations+1
-    plot!(ens_historical_m[i,1,:],ens_historical_m[i,2,:],seriestype=:scatter, label="", marker_z=i)
+    plot!(ens_historical_m[i,1,:],ens_historical_m[i,2,:],seriestype=:scatter, label="", marker_z=i, cbar=false)
 end
-plot!([1], [1], ms = 7, label="truth", markershape=:star5,) 
+plot!([1], [1], ms = 7, label="truth", markershape=:star5, markeralpha=1, mc=:red) 
 xlabel!("theta_1")
 ylabel!("theta_2")
 title!("Rosenbrock IP parameter evolution (momentum)")
 display(plot_param)
 
-## GRAD DESCENT CONV PLOT
-plot_means = plot([1:N_steps+1], mean(log.(conv_gd[i,:]) for i in 1:length(initials)), c = :black, label = "GD", legend = :topright, linewidth = 2)
-plot!([1:N_steps+1], mean(log.(conv_gdm[i,:]) for i in 1:3), c = :blue, label = "GD with momentum", legend = :topright, linewidth = 2)
-plot!([1:N_steps+1], mean(log.(conv_gdn[i,:]) for i in 1:3), c = :green, label = "GD with Nesterov momentum", legend = :topright, linewidth = 2)
-xlabel!("GD step")
-ylabel!("log(Loss)")
-push!(plots,plot_means)
+# ## GRAD DESCENT CONV PLOT
+# plot_means = plot([1:N_steps+1], mean(log.(conv_gd[i,:]) for i in 1:length(initials)), c = :black, label = "GD", legend = :topright, linewidth = 2)
+# plot!([1:N_steps+1], mean(log.(conv_gdm[i,:]) for i in 1:3), c = :blue, label = "GD with momentum", legend = :topright, linewidth = 2)
+# plot!([1:N_steps+1], mean(log.(conv_gdn[i,:]) for i in 1:3), c = :green, label = "GD with Nesterov momentum", legend = :topright, linewidth = 2)
+# xlabel!("GD step")
+# ylabel!("log(Loss)")
+# push!(plots,plot_means)
 
-plot(plots...)
+# plot(plots...)

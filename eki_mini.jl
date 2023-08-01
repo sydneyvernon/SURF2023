@@ -178,9 +178,10 @@ function run_eki_momentum(
     Γ, # covariance of measurement noise
     N_iterations::Int,
     loss_fn,
-    s=1,
+    dt=1,
     r=3
     ) 
+        s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
         for j in 1:size(initial_ensemble)[2]
             conv[1,j] = loss_fn(initial_ensemble[:,j])
@@ -206,9 +207,10 @@ function run_eki_momentum_constrained(
     Γ, # covariance of measurement noise
     N_iterations::Int,
     loss_fn,
-    s=1,
+    dt=1,
     r=3
     ) 
+        s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
         for j in 1:size(initial_ensemble)[2]
             conv[1,j] = loss_fn(initial_ensemble[:,j])
@@ -219,7 +221,7 @@ function run_eki_momentum_constrained(
         for i in 1:N_iterations
             ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r)
             if i<r ## CONSTRAIN MOMENTUM APPLICATION
-                ensemble_new = eki_update(ensemble, G, y, Γ, sqrt(s))
+                ensemble_new = eki_update(ensemble, G, y, Γ, dt)
             end
             ens_prev = ensemble
             ensemble = ensemble_new
@@ -237,9 +239,10 @@ function run_eki_momentum_means(
     Γ, # covariance of measurement noise
     N_iterations::Int,
     loss_fn,
-    s=1,
+    dt=1,
     r=3
     ) 
+        s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
         for j in 1:size(initial_ensemble)[2]
             conv[1,j] = loss_fn(initial_ensemble[:,j])
@@ -265,9 +268,10 @@ function run_eki_momentum_means_constrained(
     Γ, # covariance of measurement noise
     N_iterations::Int,
     loss_fn,
-    s=1,
+    dt=1,
     r=3
     ) 
+        s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
         for j in 1:size(initial_ensemble)[2]
             conv[1,j] = loss_fn(initial_ensemble[:,j])
@@ -278,7 +282,7 @@ function run_eki_momentum_means_constrained(
         for i in 1:N_iterations
             ensemble_new = eki_update_momentum_means(ensemble, ens_prev, G, y, Γ, i, s,r)
             if i<r ## CONSTRAIN MOMENTUM APPLICATION
-                ensemble_new = eki_update(ensemble, G, y, Γ, sqrt(s))
+                ensemble_new = eki_update(ensemble, G, y, Γ, dt)
             end
             ens_prev = ensemble
             ensemble = ensemble_new
@@ -297,9 +301,10 @@ function run_eki_momentum_tracked(
     Γ, # covariance of measurement noise
     N_iterations::Int,
     loss_fn,
-    s=1,
+    dt=1,
     r=3
     ) 
+        s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
         ens_historical = zeros(N_iterations+1, size(initial_ensemble)[1], size(initial_ensemble)[2])
         ens_historical[1,:,:] = initial_ensemble

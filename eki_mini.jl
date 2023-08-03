@@ -130,21 +130,23 @@ function eki_update_momentum_means(
     return ens_new
 end
 
-function run_eki(  # doesn't track convergence.
-    initial_ensemble,
-    G, # model
-    y, # target or observed data
-    Γ, # covariance of measurement noise
-    N_iterations::Int,
-    dt
-    ) 
-        ensemble = initial_ensemble
-        for i in 1:N_iterations
-            ensemble_new = eki_update(ensemble, G, y, Γ, dt)
-            ensemble = ensemble_new
-        end
-        return ensemble
-end
+
+
+# function run_eki(  # doesn't track convergence.
+#     initial_ensemble,
+#     G, # model
+#     y, # target or observed data
+#     Γ, # covariance of measurement noise
+#     N_iterations::Int,
+#     dt
+#     ) 
+#         ensemble = initial_ensemble
+#         for i in 1:N_iterations
+#             ensemble_new = eki_update(ensemble, G, y, Γ, dt)
+#             ensemble = ensemble_new
+#         end
+#         return ensemble
+# end
 
 function run_eki(
     initial_ensemble,
@@ -155,18 +157,14 @@ function run_eki(
     loss_fn,
     dt ## timestep
     ) 
-        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
-        end
+        conv = zeros(N_iterations+1)
+        conv[1] = loss_fn(mean(initial_ensemble,dims=2))
 
         ensemble = initial_ensemble
         for i in 1:N_iterations
             ensemble_new = eki_update(ensemble, G, y, Γ, dt)
             ensemble = ensemble_new
-            for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
-            end
+            conv[i+1] = loss_fn(mean(ensemble,dims=2))
         end
         return ensemble, conv
 end
@@ -179,54 +177,36 @@ function run_eki_momentum(
     N_iterations::Int,
     loss_fn,
     dt=1,
-    r=3
+    r=3,
+    give_mean_loss=true # if false: calculate mean loss (not loss of ensemble mean)
     ) 
         s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
+        if give_mean_loss
+            conv = zeros(N_iterations+1)
         end
-        
-        ensemble = initial_ensemble
-        ens_prev = initial_ensemble #zeros(size(initial_ensemble))
-        for i in 1:N_iterations
-            ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r)
-            ens_prev = ensemble
-            ensemble = ensemble_new
+        if give_mean_loss
+            conv[1] = loss_fn(mean(initial_ensemble, dims=2))
+        else
             for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
+                conv[1,j] = loss_fn(initial_ensemble[:,j])
             end
         end
-        return ensemble, conv
-end
 
-function run_eki_momentum_constrained(
-    initial_ensemble,
-    G, # model
-    y, # target or observed data
-    Γ, # covariance of measurement noise
-    N_iterations::Int,
-    loss_fn,
-    dt=1,
-    r=3
-    ) 
-        s = dt^2
-        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
-        end
-        
         ensemble = initial_ensemble
-        ens_prev = initial_ensemble #zeros(size(initial_ensemble))
+        ens_prev = initial_ensemble
         for i in 1:N_iterations
             ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r)
-            if i<r ## CONSTRAIN MOMENTUM APPLICATION
-                ensemble_new = eki_update(ensemble, G, y, Γ, dt)
-            end
             ens_prev = ensemble
             ensemble = ensemble_new
-            for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
+
+            # slightly different options for tracking convergence
+            if give_mean_loss
+                conv[i+1] = loss_fn(mean(ensemble, dims=2)) # loss of ens mean
+            else
+                for j in 1:size(initial_ensemble)[2]
+                    conv[i+1,j] = loss_fn(ensemble[:,j])
+                end
             end
         end
         return ensemble, conv
@@ -243,55 +223,20 @@ function run_eki_momentum_means(
     r=3
     ) 
         s = dt^2
-        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
-        end
+        conv = zeros(N_iterations+1)
+        conv[1] = loss_fn(mean(initial_ensemble, dims=2))
         
         ensemble = initial_ensemble
-        ens_prev = initial_ensemble #zeros(size(initial_ensemble))
+        ens_prev = initial_ensemble
         for i in 1:N_iterations
             ensemble_new = eki_update_momentum_means(ensemble, ens_prev, G, y, Γ, i, s,r)
             ens_prev = ensemble
             ensemble = ensemble_new
-            for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
-            end
+            conv[i+1] = loss_fn(mean(ensemble, dims=2))
         end
         return ensemble, conv
 end
 
-function run_eki_momentum_means_constrained(
-    initial_ensemble,
-    G, # model
-    y, # target or observed data
-    Γ, # covariance of measurement noise
-    N_iterations::Int,
-    loss_fn,
-    dt=1,
-    r=3
-    ) 
-        s = dt^2
-        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
-        end
-        
-        ensemble = initial_ensemble
-        ens_prev = initial_ensemble #zeros(size(initial_ensemble))
-        for i in 1:N_iterations
-            ensemble_new = eki_update_momentum_means(ensemble, ens_prev, G, y, Γ, i, s,r)
-            if i<r ## CONSTRAIN MOMENTUM APPLICATION
-                ensemble_new = eki_update(ensemble, G, y, Γ, dt)
-            end
-            ens_prev = ensemble
-            ensemble = ensemble_new
-            for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
-            end
-        end
-        return ensemble, conv
-end
 
 ## variants to TRACK PARAM VALUES
 function run_eki_momentum_tracked(
@@ -302,25 +247,23 @@ function run_eki_momentum_tracked(
     N_iterations::Int,
     loss_fn,
     dt=1,
-    r=3
+    r=3,
     ) 
         s = dt^2
-        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
+        conv = zeros(N_iterations+1)
+
         ens_historical = zeros(N_iterations+1, size(initial_ensemble)[1], size(initial_ensemble)[2])
         ens_historical[1,:,:] = initial_ensemble
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
-        end
+
+        conv[1] = loss_fn(mean(initial_ensemble, dims=2))
         
         ensemble = initial_ensemble
-        ens_prev = initial_ensemble ##zeros(size(initial_ensemble))
+        ens_prev = initial_ensemble 
         for i in 1:N_iterations
             ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r)
             ens_prev = ensemble
             ensemble = ensemble_new
-            for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
-            end
+            conv[i+1] = loss_fn(mean(ensemble, dims=2)) # loss of ens mean
             ens_historical[i+1,:,:] = ensemble
         end
         return ens_historical, conv
@@ -337,21 +280,75 @@ function run_eki_tracked(
     ) 
         ens_historical = zeros(N_iterations+1, size(initial_ensemble)[1], size(initial_ensemble)[2])
         ens_historical[1,:,:] = initial_ensemble
-        conv = zeros(N_iterations+1, size(initial_ensemble)[2])
-        for j in 1:size(initial_ensemble)[2]
-            conv[1,j] = loss_fn(initial_ensemble[:,j])
-        end
+        conv = zeros(N_iterations+1)
+        conv[1] = loss_fn(mean(initial_ensemble, dims=2))
 
         ensemble = initial_ensemble
         for i in 1:N_iterations
             ensemble_new = eki_update(ensemble, G, y, Γ, dt)
             ensemble = ensemble_new
-            for j in 1:size(initial_ensemble)[2]
-                conv[i+1,j] = loss_fn(ensemble[:,j])
-            end
+            conv[i+1] = loss_fn(mean(ensemble, dims=2))
             ens_historical[i+1,:,:] = ensemble
         end
         return ens_historical, conv
+end
+
+
+## variants constraining/delaying momentum term
+function run_eki_momentum_constrained(
+    initial_ensemble,
+    G, # model
+    y, # target or observed data
+    Γ, # covariance of measurement noise
+    N_iterations::Int,
+    loss_fn,
+    dt=1,
+    r=3
+    ) 
+        s = dt^2
+        conv = zeros(N_iterations+1)
+        conv[1] = loss_fn(mean(initial_ensemble), dims=2)
+        
+        ensemble = initial_ensemble
+        ens_prev = initial_ensemble #zeros(size(initial_ensemble))
+        for i in 1:N_iterations
+            ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r)
+            if i<r ## CONSTRAIN MOMENTUM APPLICATION
+                ensemble_new = eki_update(ensemble, G, y, Γ, dt)
+            end
+            ens_prev = ensemble
+            ensemble = ensemble_new
+            conv[i+1] = loss_fn(mean(ensemble, dims=2))
+        end
+        return ensemble, conv
+end
+
+function run_eki_momentum_means_constrained(
+    initial_ensemble,
+    G, # model
+    y, # target or observed data
+    Γ, # covariance of measurement noise
+    N_iterations::Int,
+    loss_fn,
+    dt=1,
+    r=3
+    ) 
+        s = dt^2
+        conv = zeros(N_iterations+1)
+        conv[1] = loss_fn(mean(initial_ensemble, dims=2))
+        
+        ensemble = initial_ensemble
+        ens_prev = initial_ensemble
+        for i in 1:N_iterations
+            ensemble_new = eki_update_momentum_means(ensemble, ens_prev, G, y, Γ, i, s,r)
+            if i<r ## CONSTRAIN MOMENTUM APPLICATION
+                ensemble_new = eki_update(ensemble, G, y, Γ, dt)
+            end
+            ens_prev = ensemble
+            ensemble = ensemble_new
+            conv[i+1] = loss_fn(mean(ensemble, dims=2))
+        end
+        return ensemble, conv
 end
 
 

@@ -1,4 +1,5 @@
 using LinearAlgebra, Random
+ENV["GKSwstype"]="100"
 using Distributions, Plots
 
 include("eki_mini.jl")
@@ -32,9 +33,9 @@ function main()
 
     theta_true = [1.0, 0.8]
 
-    N_trials = 100
-    N_iterations = 100  # EKI iterations in each trial
-    N_ensemble = 5
+    N_trials = 50
+    N_iterations = 200  # EKI iterations in each trial
+    N_ensemble = 20
 
     N_steps = 100 # for GD
     alpha = 5*1e-2
@@ -42,7 +43,7 @@ function main()
     # store convergence for each trial
     convs = zeros(N_trials, N_iterations+1)
     convs_m = zeros(N_trials, N_iterations+1)
-    convs_m_highorder = zeros(N_trials, N_iterations+1)
+    convs_m_fgrad = zeros(N_trials, N_iterations+1)
     convs_m_means = zeros(N_trials, N_iterations+1)
     convs_m_means_con = zeros(N_trials, N_iterations+1)
     convs_m_con = zeros(N_trials, N_iterations+1)
@@ -54,6 +55,7 @@ function main()
     beta = 0.5 ## for nesterov gd
 
     for trial in 1:N_trials
+        println("trial $(trial)")
         y = G(theta_true) .+ rand(noise_dist)  # each trial has new noise on obs
 
         function loss_fn(   ##  use log loss to deal with exponential
@@ -68,12 +70,13 @@ function main()
             return log.(norm((G(theta) .- G(theta_true))).^2) # no noise on obs AND no noise variance scaling
         end
 
-        # sample initial ensemble and perform EKI        
+        # sample initial ensemble and perform EKI
+        dt = 1.0
         initial_ensemble = draw_initial(prior, N_ensemble)
-        global ens_historical, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn, 1)
-        global ens_historical_m, conv_eki_m = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
-        global ens_final_means, conv_eki_means = run_eki_momentum_means(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
-        global ens_final_means, conv_eki_high = run_eki_momentum_highorder(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1)
+        global ens_historical, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn, dt)
+        global ens_historical_m, conv_eki_m = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3)
+        global ens_final_means, conv_eki_means = run_eki_momentum_means(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3)
+        global ens_final_means, conv_eki_high = run_eki_momentum_fgrad(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,4)
         #global ens_final_means, conv_eki_means_con = run_eki_momentum_means_constrained(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
         #global ens_final_means, conv_eki_con = run_eki_momentum_constrained(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
 
@@ -83,7 +86,7 @@ function main()
         convs[trial, :] = conv_eki  # mean loss of all ensemble members
         convs_m[trial, :] = conv_eki_m
         convs_m_means[trial,:] = conv_eki_means
-        convs_m_highorder[trial,:] = conv_eki_high
+        convs_m_fgrad[trial,:] = conv_eki_high
         # convs_m_con[trial,:] = mean(conv_eki_con, dims=2)
         # convs_m_means_con[trial,:] = mean(conv_eki_means_con, dims=2)
         # convs_gd[trial, :] = conv_gd
@@ -109,18 +112,21 @@ function main()
     # display(plot_param)
 
     ## PLOT log CONVERGENCE (EKI)
+    gr()
     plot_c = plot([0:N_iterations], (mean(convs, dims=1)[:]), c = :black, label="EKI")
-    plot!([0:N_iterations], (mean(convs_m, dims=1)[:]), c = :red, label="EKI+momentum")
-    plot!([0:N_iterations], (mean(convs_m_means, dims=1)[:]), c = :blue, label="EKI+ ens-mean momentum")
-    plot!([0:N_iterations], (mean(convs_m_highorder, dims=1)[:]), c = :green, label="high order")
+    plot!(plot_c, [0:N_iterations], (mean(convs_m, dims=1)[:]), c = :red, label="EKI+momentum")
+    plot!(plot_c, [0:N_iterations], (mean(convs_m_means, dims=1)[:]), c = :blue, label="EKI+ ens-mean momentum")
+    plot!(plot_c, [0:N_iterations], (mean(convs_m_fgrad, dims=1)[:]), c = :green, label="high order")
 
     #plot!([0:N_iterations], (mean(convs_m_con, dims=1)[:]), c = :green, label="EKI+momentum (con)")
     #plot!([0:N_iterations], (mean(convs_m_means_con, dims=1)[:]), c = :gray, label="EKI+ ens-mean momentum (con)")
 
-    xlabel!("EKI Iteration, N_ensemble = "*string(N_ensemble)*", N_trials = "*string(N_trials))
-    ylabel!("log(Loss)")
-    display(plot_c)
-    savefig(plot_c, "exp_sin.pdf")
+    xlabel!(plot_c, "EKI Iteration, N_ensemble = "*string(N_ensemble)*", N_trials = "*string(N_trials))
+    ylabel!(plot_c, "log(Loss)")
+    #    display(plot_c)
+    println("save plot")
+    
+    savefig(plot_c, "exp_sin.png");
 
     # ## PLOT PARAMETER SPACE (FROM ONE EKI TRIAL)
     # plot_param = plot()

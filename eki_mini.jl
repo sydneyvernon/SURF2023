@@ -44,6 +44,58 @@ function eki_update(
     return ens_new
 end
 
+function eki_update_momentum_fgrad(
+    ens::AbstractMatrix{},
+    ens_prev,
+    v_prev,
+    G_, 
+    y,
+    Γ_,
+    k::Int, ## iteration number
+    s, ## dt^2
+    r
+)
+    N = size(ens)[2] # number of ensemble members
+    N_param = size(ens)[1] # number of parameters (dim theta)
+    
+    # run G on ensemble members
+    ens_eval_0 = G_(v_prev[:,1])
+    N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
+    ens_eval = zeros(N_out, N)
+    ens_eval[:,1] = ens_eval_0
+    for i in 2:N 
+        ens_eval[:,i] = G_(v_prev[:,i])
+    end
+
+    # compute empirical covariance matrices
+    t_mean = mean(v_prev, dims=2)
+    g_mean = mean(ens_eval, dims=2)
+    C_tg = 1/N * sum((v_prev[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+    C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+
+    # construct array of updated ensemble members
+   
+    ens_new = zeros(N_param, N)
+
+    beta = 0.51
+    for i in 1:N
+        sfgrad =  - s*C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i])
+        ens_new[:,i] = v_prev[:,i] .- beta*sfgrad
+    end
+
+   
+    mean_update = false
+    if mean_update
+        v = (1-(1/beta))* v_prev .+ (1/beta)*ens_new  .+ (1-r/(k+r))*(mean(ens_new - ens,dims=2))
+    else
+        v = (1-(1/beta))* v_prev .+ (1/beta)*ens_new  .+ (1-r/(k+r))*(ens_new - ens)
+    end
+    
+
+    return ens_new, v
+end
+
+
 function eki_update_momentum(
     ens::AbstractMatrix{},
     ens_prev,
@@ -58,29 +110,28 @@ function eki_update_momentum(
     N_param = size(ens)[1] # number of parameters (dim theta)
     
     # run G on ensemble members
-    ens_eval_0 = G_(ens[:,1] .+ (1-r/k)*(ens[:,1] .- ens_prev[:,1])) # first output 
+    v = ens .+ (1-r/k)*(ens .- ens_prev)
+    ens_eval_0 = G_(v[:,1]) # first output 
     N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
     ens_eval = zeros(N_out, N)
     ens_eval[:,1] = ens_eval_0
     for i in 2:N 
-        ens_eval[:,i] = G_(ens[:,i] .+ (1-r/k)*(ens[:,i] .- ens_prev[:,i]))
+        ens_eval[:,i] = G_(v[:,i])
     end
-
+    
     # compute empirical covariance matrices
-    t_mean = mean(ens, dims=2)
+    t_mean = mean(v, dims=2)
     g_mean = mean(ens_eval, dims=2)
-    C_tg = 1/N * sum((ens[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+    C_tg = 1/N * sum((v[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
     C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
-
+    
     # construct array of updated ensemble members
-    v = zeros(N_param, N)
     ens_new = zeros(N_param, N)
-
+    
     for i in 1:N
-        v[:,i] = ens[:,i] .+ (1-r/k)*(ens[:,i] .- ens_prev[:,i])
         ens_new[:,i] = v[:,i] .+ s*C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i])
     end
-
+    
     return ens_new
 end
 
@@ -98,30 +149,26 @@ function eki_update_momentum_means(
     N_param = size(ens)[1] # number of parameters (dim theta)
     
     # run G on ensemble members
-    ens_eval_0 = G_(ens[:,1] .+ (1-r/k)*(ens[:,1] .- ens_prev[:,1])) # first output 
+    v = ens .+ (1-r/k)*mean(ens - ens_prev,dims=2)
+    ens_eval_0 = G_(v[:,1])
     N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
     ens_eval = zeros(N_out, N)
     ens_eval[:,1] = ens_eval_0
     for i in 2:N 
-        ens_eval[:,i] = G_(ens[:,i] .+ (1-r/k)*(ens[:,i] .- ens_prev[:,i]))
+        ens_eval[:,i] = G_(v[:,i])
     end
-
+    
     # compute empirical covariance matrices
-    t_mean = mean(ens, dims=2)
+    t_mean = mean(v, dims=2)
     g_mean = mean(ens_eval, dims=2)
-    C_tg = 1/N * sum((ens[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+    C_tg = 1/N * sum((v[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
     C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
 
-    # momentum follows the ensemble means
-    ens_mean = mean(ens, dims=2)
-    ens_mean_prev = mean(ens_prev, dims=2)
 
     # construct array of updated ensemble members
-    v = zeros(N_param, N)
     ens_new = zeros(N_param, N)
 
     for i in 1:N
-        v[:,i] = ens[:,i] .+ (1-r/k)*(ens_mean .- ens_mean_prev)
         ens_new[:,i] = v[:,i] .+ s*C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i])  ## C_gg should be evaluated WHERE
         # if k < r
         #     ens_new[:,i] = ens[:,i] .+ C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]) # normal update step
@@ -278,6 +325,52 @@ function run_eki_momentum(
         end
         return ensemble, conv
 end
+
+function run_eki_momentum_fgrad(
+    initial_ensemble,
+    G, # model
+    y, # target or observed data
+    Γ, # covariance of measurement noise
+    N_iterations::Int,
+    loss_fn,
+    dt=1,
+    r=4,
+    give_mean_loss=true # if false: calculate mean loss (not loss of ensemble mean)
+) 
+    s = dt^2
+    conv = zeros(N_iterations+1, size(initial_ensemble)[2])
+    if give_mean_loss
+        conv = zeros(N_iterations+1)
+    end
+    if give_mean_loss
+        conv[1] = loss_fn(mean(initial_ensemble, dims=2))
+    else
+        for j in 1:size(initial_ensemble)[2]
+                conv[1,j] = loss_fn(initial_ensemble[:,j])
+        end
+    end
+    
+    ensemble = initial_ensemble
+    ens_prev = initial_ensemble
+    v = initial_ensemble
+    for i in 1:N_iterations
+        ensemble_new, v_new = eki_update_momentum_fgrad(ensemble, ens_prev, v, G, y, Γ, i, s,r)
+        ens_prev = ensemble
+        ensemble = ensemble_new
+        v = v_new
+        
+        # slightly different options for tracking convergence
+        if give_mean_loss
+            conv[i+1] = loss_fn(mean(ensemble, dims=2)) # loss of ens mean
+        else
+            for j in 1:size(initial_ensemble)[2]
+                conv[i+1,j] = loss_fn(ensemble[:,j])
+            end
+        end
+    end
+    return ensemble, conv
+end
+
 
 function run_eki_momentum_means(
     initial_ensemble,

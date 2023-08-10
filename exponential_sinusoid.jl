@@ -1,5 +1,6 @@
 using LinearAlgebra, Random
 using Distributions, Plots
+ENV["GKSwstype"]="100"
 
 include("eki_mini.jl")
 include("gradientdescent.jl")
@@ -26,15 +27,16 @@ end
 
 function main()
     dim_output = 2
-    Γ = I(2)*0.01
+    Γ = I(2)*0.001
     noise_dist = MvNormal(zeros(dim_output), Γ)
     prior = MvNormal([2,0], diagm([0.1,0.5]))
 
     theta_true = [1.0, 0.8]
 
-    N_trials = 100
-    N_iterations = 100  # EKI iterations in each trial
-    N_ensemble = 5
+    N_trials = 50
+    N_iterations = 200  # EKI iterations in each trial
+    N_ensemble = 20 
+    dt = 1.0
 
     N_steps = 100 # for GD
     alpha = 5*1e-2
@@ -70,10 +72,10 @@ function main()
 
         # sample initial ensemble and perform EKI        
         initial_ensemble = draw_initial(prior, N_ensemble)
-        global ens_historical, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn, 1)
-        global ens_historical_m, conv_eki_m = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
-        global ens_final_means, conv_eki_means = run_eki_momentum_means(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
-        global ens_final_means, conv_eki_high = run_eki_momentum_highorder(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1)
+        global ens_historical, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn, dt)
+        global ens_historical_m, conv_eki_m = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3)
+        global ens_final_means, conv_eki_means = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3,true)
+        #global ens_final_means, conv_eki_high = run_eki_momentum_highorder(initial_ensemble, G, y, Γ, N_iterations, loss_fn,0.05)
         #global ens_final_means, conv_eki_means_con = run_eki_momentum_means_constrained(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
         #global ens_final_means, conv_eki_con = run_eki_momentum_constrained(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
 
@@ -83,7 +85,7 @@ function main()
         convs[trial, :] = conv_eki  # mean loss of all ensemble members
         convs_m[trial, :] = conv_eki_m
         convs_m_means[trial,:] = conv_eki_means
-        convs_m_highorder[trial,:] = conv_eki_high
+        #convs_m_highorder[trial,:] = conv_eki_high
         # convs_m_con[trial,:] = mean(conv_eki_con, dims=2)
         # convs_m_means_con[trial,:] = mean(conv_eki_means_con, dims=2)
         # convs_gd[trial, :] = conv_gd
@@ -112,7 +114,7 @@ function main()
     plot_c = plot([0:N_iterations], (mean(convs, dims=1)[:]), c = :black, label="EKI")
     plot!([0:N_iterations], (mean(convs_m, dims=1)[:]), c = :red, label="EKI+momentum")
     plot!([0:N_iterations], (mean(convs_m_means, dims=1)[:]), c = :blue, label="EKI+ ens-mean momentum")
-    plot!([0:N_iterations], (mean(convs_m_highorder, dims=1)[:]), c = :green, label="high order")
+    #plot!([0:N_iterations], (mean(convs_m_highorder, dims=1)[:]), c = :green, label="high order")
 
     #plot!([0:N_iterations], (mean(convs_m_con, dims=1)[:]), c = :green, label="EKI+momentum (con)")
     #plot!([0:N_iterations], (mean(convs_m_means_con, dims=1)[:]), c = :gray, label="EKI+ ens-mean momentum (con)")

@@ -20,9 +20,8 @@ function eki_update(
     N_param = size(ens)[1] # number of parameters (dim theta)
     
     # run G on ensemble members
-    ens_eval_0 = G_(ens[:,1]) # first output 
+    ens_eval_0 = G_(ens[:,1])
     N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
-
     ens_eval = zeros(N_out, N)
     ens_eval[:,1] = ens_eval_0
     for i in 2:N 

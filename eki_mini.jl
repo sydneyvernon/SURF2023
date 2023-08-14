@@ -53,7 +53,7 @@ function eki_update_momentum(
     k::Int, ## iteration number
     s, ## dt^2
     r,
-    mean_update = false
+    mean_update::Bool = false
 )
     N = size(ens)[2] # number of ensemble members
     N_param = size(ens)[1] # number of parameters (dim theta)
@@ -98,132 +98,128 @@ function eki_update_momentum(
     return ens_new
 end
 
-## old version
-function eki_update_momentum_highorder_(
-    ens::AbstractMatrix{},
-    grad_f_prev,
-    v_prev,
-    G_, 
-    y,
-    Γ_,
-    k::Int, ## iteration number
-    s, ## dt^2
-)
-    N = size(ens)[2] # number of ensemble members
-    N_param = size(ens)[1] # number of parameters (dim theta)
+# ## old version
+# function eki_update_momentum_highorder_(
+#     ens::AbstractMatrix{},
+#     grad_f_prev,
+#     v_prev,
+#     G_, 
+#     y,
+#     Γ_,
+#     k::Int, ## iteration number
+#     s, ## dt^2
+# )
+#     N = size(ens)[2] # number of ensemble members
+#     N_param = size(ens)[1] # number of parameters (dim theta)
 
-    # INITIAL CONDITION: v_0 = -sqrt(s) * grad_f(x_0)
-    if k == 0
-        ens_eval_0 = G_(ens[:,1])
-        N_out = size(ens_eval_0)[1]
-        ens_eval = zeros(N_out, N)
-        ens_eval[:,1] = ens_eval_0
-        for i in 2:N 
-            ens_eval[:,i] = G_(ens[:,i])
-        end
-        t_mean = mean(ens, dims=2)
-        g_mean = mean(ens_eval, dims=2)
-        C_tg = 1/N * sum((ens[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
-        C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
-        grad_f_prev = zeros(N_param,N)  ## delta f(x_k+1)
-        for i in 1:N
-            grad_f_prev[:,i] = (C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]))
-        end
-        v_prev = -sqrt(s).*grad_f_prev
-    end
+#     # INITIAL CONDITION: v_0 = -sqrt(s) * grad_f(x_0)
+#     if k == 0
+#         ens_eval_0 = G_(ens[:,1])
+#         N_out = size(ens_eval_0)[1]
+#         ens_eval = zeros(N_out, N)
+#         ens_eval[:,1] = ens_eval_0
+#         for i in 2:N 
+#             ens_eval[:,i] = G_(ens[:,i])
+#         end
+#         t_mean = mean(ens, dims=2)
+#         g_mean = mean(ens_eval, dims=2)
+#         C_tg = 1/N * sum((ens[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+#         C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+#         grad_f_prev = zeros(N_param,N)  ## delta f(x_k+1)
+#         for i in 1:N
+#             grad_f_prev[:,i] = (C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]))
+#         end
+#         v_prev = -sqrt(s).*grad_f_prev
+#     end
 
-    # update ensemble
-    ens_new = zeros(size(ens))
-    for i in 1:N  ## vectorize??
-        ens_new[:,i] = ens[:,i] .- sqrt(s)*v_prev[:,i]  ## I think this should be .+ from the paper but - seems to work??
-    end
+#     # update ensemble
+#     ens_new = zeros(size(ens))
+#     for i in 1:N  ## vectorize??
+#         ens_new[:,i] = ens[:,i] .- sqrt(s)*v_prev[:,i]  ## I think this should be .+ from the paper but - seems to work??
+#     end
 
-    # run G on CURRENT ensemble
-    ens_eval_0 = G_(ens_new[:,1])
-    N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
-    ens_eval = zeros(N_out, N)
-    ens_eval[:,1] = ens_eval_0
-    for i in 2:N 
-        ens_eval[:,i] = G_(ens_new[:,i])
-    end
+#     # run G on CURRENT ensemble
+#     ens_eval_0 = G_(ens_new[:,1])
+#     N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
+#     ens_eval = zeros(N_out, N)
+#     ens_eval[:,1] = ens_eval_0
+#     for i in 2:N 
+#         ens_eval[:,i] = G_(ens_new[:,i])
+#     end
 
-    # compute empirical covariance matrices
-    t_mean = mean(ens_new, dims=2)
-    g_mean = mean(ens_eval, dims=2)
-    C_tg = 1/N * sum((ens_new[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
-    C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+#     # compute empirical covariance matrices
+#     t_mean = mean(ens_new, dims=2)
+#     g_mean = mean(ens_eval, dims=2)
+#     C_tg = 1/N * sum((ens_new[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+#     C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
 
-    # gradients evaluated at current+past positions
-    grad_f_current = zeros(N_param,N)  ## delta f(x_k+1)
-    for i in 1:N
-        grad_f_current[:,i] = (C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]))
-    end
+#     # gradients evaluated at current+past positions
+#     grad_f_current = zeros(N_param,N)  ## delta f(x_k+1)
+#     for i in 1:N
+#         grad_f_current[:,i] = (C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]))
+#     end
 
-    # update v
-    v = zeros(N_param, N)
-    for i in 1:N
-        v[:,i] = ((k+1)/(k+4)) * (v_prev[:,i] .- sqrt(s)*(grad_f_current[:,i] .- grad_f_prev[:,i]) - sqrt(s)*((k+4)/(k+1))*grad_f_current[:,i])
-    end
-    return ens_new, grad_f_current, v
-end
+#     # update v
+#     v = zeros(N_param, N)
+#     for i in 1:N
+#         v[:,i] = ((k+1)/(k+4)) * (v_prev[:,i] .- sqrt(s)*(grad_f_current[:,i] .- grad_f_prev[:,i]) - sqrt(s)*((k+4)/(k+1))*grad_f_current[:,i])
+#     end
+#     return ens_new, grad_f_current, v
+# end
+
 
 ## DuJorShiSu22
 function eki_update_momentum_highorder(
     ens::AbstractMatrix{},
-    grad_f_prev,  # i dont think we use this here
+    ens_prev,
     v_prev,
     G_, 
     y,
     Γ_,
     k::Int, ## iteration number
     s, ## dt^2
-    alpha=4
+    alpha=4,
+    beta=0.51,
+    mean_update::Bool=false
 )
     N = size(ens)[2] # number of ensemble members
     N_param = size(ens)[1] # number of parameters (dim theta)
-    println(k)
-    # INITIAL CONDITION: v_0 = u_0
-    if k == 0
-        v_prev = ens
-        #grad_f_prev
-    end
 
     # run G on v_prev
-    ens_eval_0 = G_(v_prev[:,1])
-    N_out = size(ens_eval_0)[1] # number of (summary) outputs (dim G(theta))
-    ens_eval = zeros(N_out, N)
-    ens_eval[:,1] = ens_eval_0
+    v_eval_0 = G_(v_prev[:,1])
+    N_out = size(v_eval_0)[1] # number of (summary) outputs (dim G(theta))
+    v_eval = zeros(N_out, N)
+    v_eval[:,1] = v_eval_0
     for i in 2:N 
-        ens_eval[:,i] = G_(v_prev[:,i])
+        v_eval[:,i] = G_(v_prev[:,i])
     end
 
     # compute empirical covariance matrices
     t_mean = mean(v_prev, dims=2)
-    g_mean = mean(ens_eval, dims=2)
-    C_tg = 1/N * sum((v_prev[:,i] .- t_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
-    C_gg = 1/N * sum((ens_eval[:,i] .- g_mean)*(ens_eval[:,i] .- g_mean)' for i in 1:N)
+    g_mean = mean(v_eval, dims=2)
+    C_tg = 1/N * sum((v_prev[:,i] .- t_mean)*(v_eval[:,i] .- g_mean)' for i in 1:N)
+    C_gg = 1/N * sum((v_eval[:,i] .- g_mean)*(v_eval[:,i] .- g_mean)' for i in 1:N)
 
     # gradients evaluated at current+past positions
     grad_f_current = zeros(N_param,N)  ## delta f(x_k+1)
     for i in 1:N
-        grad_f_current[:,i] = (C_tg * inv(Γ_ .+ C_gg) * (y .- ens_eval[:,i]))
+        grad_f_current[:,i] = (C_tg * inv(Γ_ .+ C_gg) * (y .- v_eval[:,i]))
     end
 
     # update u
     ens_new = zeros(N_param, N)
     for i in 1:N
-        ens_new[:,i] = v_prev[:,i] .+ 0.51*s*grad_f_current[:,i] 
+        ens_new[:,i] = v_prev[:,i] .+ beta*s*grad_f_current[:,i] 
     end
 
     # update v
     v = zeros(size(ens))
     for i in 1:N
-        v[:,i] = v_prev[:,i] .- s*grad_f_current[:,i] .+ (k/(k+alpha))*(ens_new[:,i] - ens[:,i])
+        v[:,i] = v_prev[:,i] .+ s*grad_f_current[:,i] .+ (k/(k+alpha))*(ens_new[:,i] - ens[:,i])
     end
 
-    return ens_new, grad_f_current, v
+    return ens_new, v
 end
-
 
 # function run_eki(  # doesn't track convergence.
 #     initial_ensemble,
@@ -339,18 +335,22 @@ function run_eki_momentum_highorder(
     N_iterations::Int,
     loss_fn,
     dt=1,
+    alpha=4,
+    beta=0.51,
+    mean_update=false  # toggle "ensemble-mean" momentum approach
     ) 
         s = dt^2
         conv = zeros(N_iterations+1)
         conv[1] = loss_fn(mean(initial_ensemble, dims=2))
 
         ensemble = initial_ensemble
-        v_prev = zeros(size(initial_ensemble))  ## overridden for k=1 within update step
-        grad_f_prev = zeros(size(initial_ensemble)) # overridden for k=1 within update step
+        ens_prev = initial_ensemble
+        ens_new = initial_ensemble
+        v_prev = initial_ensemble ## I.C. u_0 = v_0
         for i in 1:N_iterations
-            ens_new, grad_new, v = eki_update_momentum_highorder(ensemble, grad_f_prev, v_prev, G, y, Γ, i-1, s)
+            ens_new, v = eki_update_momentum_highorder(ensemble, ens_prev, v_prev, G, y, Γ, i-1, s, alpha, beta, mean_update)
+            ens_prev = ensemble
             ensemble = ens_new
-            grad_f_prev = grad_new
             v_prev = v
             conv[i+1] = loss_fn(mean(ensemble, dims=2)) # loss of ens mean
         end

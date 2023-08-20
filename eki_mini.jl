@@ -94,7 +94,7 @@ function eki_update_momentum(
             ens_new[:,i] = v[:,i] .+ s*C_tg * inv(Γ_ .+ C_gg) * (y .- v_eval[:,i])
         end
     end
-    return ens_new
+    return ens_new, v
 end
 
 ## DuJorShiSu22
@@ -185,11 +185,14 @@ function run_eki_momentum(
     ) 
         s = dt^2
         conv = zeros(N_iterations+1, size(initial_ensemble)[2])
+        
         if give_mean_loss
             conv = zeros(N_iterations+1)
+            conv_v = zeros(N_iterations+1) ## temporary experiment
         end
         if give_mean_loss
             conv[1] = loss_fn(mean(initial_ensemble, dims=2))
+            conv_v[1] = loss_fn(mean(initial_ensemble, dims=2))  ## from our IC, v_0 = u_0.
         else
             for j in 1:size(initial_ensemble)[2]
                 conv[1,j] = loss_fn(initial_ensemble[:,j])
@@ -199,20 +202,21 @@ function run_eki_momentum(
         ensemble = initial_ensemble
         ens_prev = initial_ensemble
         for i in 1:N_iterations
-            ensemble_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r, mean_update)
+            ensemble_new, v_new = eki_update_momentum(ensemble, ens_prev, G, y, Γ, i, s,r, mean_update)
             ens_prev = ensemble
             ensemble = ensemble_new
 
             # slightly different options for tracking convergence
             if give_mean_loss
                 conv[i+1] = loss_fn(mean(ensemble, dims=2)) # loss of ens mean
+                conv_v[i] = loss_fn(mean(v_new, dims=2)) # loss of "v" ens mean # i think the index shift makes sense?
             else
                 for j in 1:size(initial_ensemble)[2]
                     conv[i+1,j] = loss_fn(ensemble[:,j])
                 end
             end
         end
-        return ensemble, conv
+        return ensemble, conv, conv_v
 end
 
 function run_eki_momentum_highorder(

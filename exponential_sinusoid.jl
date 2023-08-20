@@ -26,16 +26,16 @@ end
 
 function main()
     dim_output = 2
-    Γ = I(2)*0.001
+    Γ = I(2)*0.01
     noise_dist = MvNormal(zeros(dim_output), Γ)
     prior = MvNormal([2,0], diagm([0.1,0.5]))
 
     theta_true = [1.0, 0.8]
 
     N_trials = 50
-    N_iterations = 200  # EKI iterations in each trial
-    N_ensemble = 20 
-    dt = 1.0
+    N_iterations = 100  # EKI iterations in each trial
+    N_ensemble = 10
+    dt = 1
 
     N_steps = 100 # for GD
     alpha = 5*1e-2
@@ -43,10 +43,14 @@ function main()
     # store convergence for each trial
     convs = zeros(N_trials, N_iterations+1)
     convs_m = zeros(N_trials, N_iterations+1)
+    convs_m_v = zeros(N_trials, N_iterations+1)
     convs_m_highorder = zeros(N_trials, N_iterations+1)
     convs_m_means = zeros(N_trials, N_iterations+1)
+    convs_m_highorder_means = zeros(N_trials, N_iterations+1)
     convs_m_means_con = zeros(N_trials, N_iterations+1)
     convs_m_con = zeros(N_trials, N_iterations+1)
+    global ens_final_eki = 0
+    global ens_final_eki_m = 0
     # convs_gd = zeros(N_trials, N_steps+1)
     # global ens_historical = zeros(N_iterations+1, dim_input, N_ensemble)
     # global ens_historical_m = zeros(N_iterations+1, dim_input, N_ensemble)
@@ -71,10 +75,12 @@ function main()
 
         # sample initial ensemble and perform EKI        
         initial_ensemble = draw_initial(prior, N_ensemble)
-        global ens_historical, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn, dt)
-        global ens_historical_m, conv_eki_m = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3)
-        global ens_final_means, conv_eki_means = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3,true)
-        global ens_final_means, conv_eki_high = run_eki_momentum_highorder(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt)
+        global ens_final_eki, conv_eki = run_eki(initial_ensemble, G, y, Γ, N_iterations, loss_fn, dt)
+        global ens_final_eki_m, conv_eki_m, conv_eki_m_v = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3)
+        #global ens_final_eki_m, conv_eki_means = run_eki_momentum(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,3,true)
+        # global ens_final, conv_eki_high = run_eki_momentum_highorder(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt)
+        # global ens_final, conv_eki_high_means = run_eki_momentum_highorder(initial_ensemble, G, y, Γ, N_iterations, loss_fn,dt,4,0.51,true)
+
         #global ens_final_means, conv_eki_means_con = run_eki_momentum_means_constrained(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
         #global ens_final_means, conv_eki_con = run_eki_momentum_constrained(initial_ensemble, G, y, Γ, N_iterations, loss_fn,1,3)
 
@@ -83,8 +89,11 @@ function main()
 
         convs[trial, :] = conv_eki  # mean loss of all ensemble members
         convs_m[trial, :] = conv_eki_m
-        convs_m_means[trial,:] = conv_eki_means
-        convs_m_highorder[trial,:] = conv_eki_high
+        convs_m_v[trial, :] = conv_eki_m_v
+
+        # convs_m_means[trial,:] = conv_eki_means
+        # convs_m_highorder[trial,:] = conv_eki_high
+        # convs_m_highorder_means[trial,:] = conv_eki_high_means
         # convs_m_con[trial,:] = mean(conv_eki_con, dims=2)
         # convs_m_means_con[trial,:] = mean(conv_eki_means_con, dims=2)
         # convs_gd[trial, :] = conv_gd
@@ -110,15 +119,18 @@ function main()
     # display(plot_param)
 
     ## PLOT log CONVERGENCE (EKI)
-    plot_c = plot([0:N_iterations], (mean(convs, dims=1)[:]), c = :black, label="EKI")
-    plot!([0:N_iterations], (mean(convs_m, dims=1)[:]), c = :red, label="EKI+momentum")
-    plot!([0:N_iterations], (mean(convs_m_means, dims=1)[:]), c = :blue, label="EKI+ ens-mean momentum")
-    plot!([0:N_iterations], (mean(convs_m_highorder, dims=1)[:]), c = :green, label="high order")
+    plot_c = plot([0:N_iterations], (mean(convs, dims=1)[:]), c = :black, label="EKI, traditional")
+    plot!([0:N_iterations], (mean(convs_m, dims=1)[:]), c = :red, label="EKI with momentum")
+    plot!([0:N_iterations], (mean(convs_m_v, dims=1)[:]), c = :green, label="EKI with momentum, v plot")
+
+    # plot!([0:N_iterations], (mean(convs_m_means, dims=1)[:]), c = :blue, label="EKI+momentum (ens-mean)")
+    # plot!([0:N_iterations], (mean(convs_m_highorder, dims=1)[:]), c = :green, label="high order")
+    # plot!([0:N_iterations], (mean(convs_m_highorder_means, dims=1)[:]), c = :orange, label="high order (ens-mean)")
 
     #plot!([0:N_iterations], (mean(convs_m_con, dims=1)[:]), c = :green, label="EKI+momentum (con)")
     #plot!([0:N_iterations], (mean(convs_m_means_con, dims=1)[:]), c = :gray, label="EKI+ ens-mean momentum (con)")
 
-    xlabel!("EKI Iteration, N_ensemble = "*string(N_ensemble)*", N_trials = "*string(N_trials))
+    xlabel!("EKI Iteration, N_ensemble = "*string(N_ensemble)*", N_trials = "*string(N_trials)*", dt = "*string(dt))
     ylabel!("log(Loss)")
     display(plot_c)
     savefig(plot_c, "exp_sin.pdf")
@@ -147,6 +159,24 @@ function main()
     # ylabel!("theta_2")
     # title!("Exp sin parameter evolution (momentum)")
     # display(plot_param)
+
+    # # PLOT MODEL EVALUATIONS, INITIAL/FINAL (all)
+    # println(size(convs))
+    # initial_ensemble = 
+    # initial_ensemble_m = 
+    # final_ensemble = ens_final_eki
+    # final_ensemble_m = ens_final_eki_m
+    # plot_a = plot(trange, model(theta_true...), c = :black, label = "Truth", legend = :bottomright, linewidth = 2)
+    # plot!(
+    #     trange,
+    #     [model(initial_ensemble[:, i]...) for i in 1:N_ensemble],
+    #     c = :red,
+    #     label = ["Initial ensemble" "" "" "" ""],
+    # )
+    # plot!(trange, [model(final_ensemble[:, i]...) for i in 1:N_ensemble], c = :blue, label = ["Final ensemble" "" "" "" ""])
+    # xlabel!("Time")
+    # display(plot_a)
+    # savefig(plot_a,"exp_sinusoidal_modeled.pdf") 
 
 end
 
